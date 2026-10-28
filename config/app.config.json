@@ -1,0 +1,36 @@
+{
+  "name": "M4RKETING by TAKATAK",
+  "cloverAppId": "EQRZ028619JRW",
+  "developerId": "9KJ25ATT15TTW",
+  "portalStatus": "draft",
+  "webhookEvents": [
+    "C",
+    "O",
+    "I",
+    "A"
+  ],
+  "permissions": "Customers R/W · Inventory R/W (rabais) · Orders R · Merchant R",
+  "tiers": [
+    {
+      "name": "Base",
+      "priceCadPerMonth": 50
+    },
+    {
+      "name": "Premium",
+      "priceCadPerMonth": 100
+    },
+    {
+      "name": "VIP",
+      "priceCadPerMonth": 150
+    }
+  ],
+  "envVars": [
+    "CLOVER_APP_ID",
+    "CLOVER_CLIENT_ID",
+    "CLOVER_CLIENT_SECRET",
+    "CLOVER_WEBHOOK_AUTH",
+    "CLOVER_API_BASE",
+    "APP_BASE_URL",
+    "DATABASE_URL"
+  ]
+}
