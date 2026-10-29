@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
 // { name, amountCents } or { name, percentage } → a Clover discount named "M4 · <name>".
 export async function POST(req: Request) {
-  const c = await requireMerchant(req);
+  const c = await requireMerchant(req, 'base', { action: 'marketing.discounts' });
   if (!isCtx(c)) return c;
   const b = await readJson(req);
   if (!b) return fail('JSON body required');
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const c = await requireMerchant(req);
+  const c = await requireMerchant(req, 'base', { action: 'marketing.discounts' });
   if (!isCtx(c)) return c;
   const r = await deleteDiscount(c.merchantId, new URL(req.url).searchParams.get('id') ?? '');
   return r.ok ? ok() : fail(r.error ?? 'Not removed');

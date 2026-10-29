@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 // Premium: GET ?segment=lapsing → CSV of that segment's customers who accepted marketing in Clover.
 export async function GET(req: Request) {
-  const c = await requireMerchant(req, 'premium');
+  const c = await requireMerchant(req, 'premium', { action: 'marketing.export', audit: 'always' });
   if (!isCtx(c)) return c;
   const segment = new URL(req.url).searchParams.get('segment') as Segment;
   if (!SEGMENTS.includes(segment)) return fail('segment must be new, regular, lapsing or lost');

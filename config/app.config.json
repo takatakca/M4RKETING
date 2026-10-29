@@ -10,7 +10,7 @@
     "I",
     "A"
   ],
-  "permissions": "Customers R/W · Inventory R/W (rabais) · Orders R · Merchant R",
+  "permissions": "Customers R/W · Inventory R/W (rabais) · Orders R · Merchant R · Employees R (rôles des personnes, Compte → Actions autorisées)",
   "tiers": [
     {
       "name": "Base",

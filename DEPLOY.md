@@ -82,3 +82,18 @@ Installer l'app sur le marchand de test → l'ouvrir depuis le tableau de bord C
 ### 5.5 Ce qui reste (code)
 
 Voir `README.md` › « État du code ».
+
+## 6. Tableau de bord premium, rôles et suite — ajouté 2026-10-29
+
+1. **Clover Developer Dashboard → l'app → Permissions : cocher « Employees : Read »** (si ce n'est pas déjà fait). Sans
+   elle, Clover ne dit pas le rôle de la personne qui ouvre l'app : tout le monde est traité comme propriétaire (bannière
+   dans Compte → Actions autorisées). Après le changement, rouvrir l'app depuis Clover.
+2. Rien d'autre à régler pour le menu, le compte, les actions autorisées et le journal : tout est dans l'app.
+3. Optionnel : `SUPPORT_URL` (adresse https de la page de soutien TAKATAK) ajoute le bouton « Écrire au soutien » dans
+   Aide.
+4. Suite TAKATAK : avec `FOODHUB_URL` + `FOODHUB_SUITE_SECRET` réglés, l'app annonce à Food Hub chaque restaurant qui
+   l'installe ou la retire, et lit l'annuaire pour son sélecteur d'apps. Il faut la version de Food Hub qui a
+   `/api/suite/v1/directory` (PR Food Hub #102). La tâche planifiée `/api/cron` renvoie les annonces manquées et vide le
+   journal d'activité de plus de 180 jours.
+5. Vérifier après déploiement : ouvrir l'app depuis Clover → le menu de gauche, Compte → Profil (votre nom et votre rôle
+   « confirmé »), Compte → Actions autorisées, TAKATAK Suite (les apps installées s'affichent « Installée »).
