@@ -1,25 +1,12 @@
 import { NextResponse } from 'next/server';
-import { cloverConfig, cloverConfigured } from '@/lib/clover/config';
+import { cloverConfigured, cloverMissing } from '@/lib/clover/config';
+import { authorizeUrl } from '@/lib/clover/oauth';
 
 export const dynamic = 'force-dynamic';
 
-// « Connecter un marchand Clover » → page d'approbation Clover de l'app
-// « M4RKETING by TAKATAK » → retour au callback. Modèle : Food Hub
-// (app/api/foodhub/clover-connect/start/route.ts). OAuth Clover v2.
-// TODO: ajouter PKCE (code_verifier/code_challenge) comme les packages le prescrivent,
-// et restreindre ce point d'entrée aux rôles autorisés de l'app.
+// "Connect with Clover": sends the merchant to Clover's approval page for this app, then back to the callback with a
+// signed, single-purpose state (15 minutes). Same flow as TAKATAK Food Hub (clover-connect/start).
 export async function GET() {
-  if (!cloverConfigured()) {
-    return NextResponse.json(
-      { ok: false, error: 'CLOVER_CLIENT_ID / CLOVER_CLIENT_SECRET manquants (voir DEPLOY.md)' },
-      { status: 500 },
-    );
-  }
-  const redirectUri = `${cloverConfig.appBaseUrl}/api/clover/connect/callback`;
-  const state = crypto.randomUUID(); // TODO: lier l'état à la session de l'utilisateur
-  const url = new URL('https://www.clover.com/oauth/v2/authorize');
-  url.searchParams.set('client_id', cloverConfig.clientId);
-  url.searchParams.set('redirect_uri', redirectUri);
-  url.searchParams.set('state', state);
-  return NextResponse.redirect(url);
+  if (!cloverConfigured()) return NextResponse.json({ ok: false, error: `Missing: ${cloverMissing().join(', ')} (see DEPLOY.md)` }, { status: 503 });
+  return NextResponse.redirect(authorizeUrl());
 }

@@ -1,0 +1,31 @@
+{
+  "name": "m4rketing-by-takatak",
+  "version": "0.1.0",
+  "private": true,
+  "description": "M4RKETING by TAKATAK \u2014 Clover App Market app, TAKATAK Suite",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3",
+    "vitest": "4.1.12"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

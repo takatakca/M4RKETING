@@ -1,4 +1,5 @@
 {
+  "key": "m4rketing",
   "name": "M4RKETING by TAKATAK",
   "cloverAppId": "EQRZ028619JRW",
   "developerId": "9KJ25ATT15TTW",
@@ -32,5 +33,7 @@
     "CLOVER_API_BASE",
     "APP_BASE_URL",
     "DATABASE_URL"
-  ]
+  ],
+  "summaryFr": "Marketing branché sur vos vraies données Clover : segments clients, rabais gérés dans l’inventaire, campagnes mesurées par les commandes.",
+  "summaryEn": "Marketing on your real Clover data: customer segments, discounts managed in inventory, campaigns measured by orders."
 }

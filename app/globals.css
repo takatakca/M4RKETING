@@ -1,0 +1,31 @@
+/* GROUPE TAKATAK brand (BRAND.md): electric blue on deep navy; green / amber / red for status only. */
+:root {
+  --navy: #060D1F; --midnight: #0B1B3D; --blue: #1F8BFF; --blue-light: #1565D8; --cyan: #29C3FF; --white: #F5F8FC; --silver: #B8C4D3;
+  --ok: #22C55E; --warn: #F59E0B; --stop: #EF4444; --line: rgba(184, 196, 211, 0.18);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--navy); color: var(--white); font: 16px/1.5 Inter, Montserrat, system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--cyan); }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--midnight); }
+.brand { font-weight: 800; letter-spacing: 0.04em; } .brand small { display: block; font-weight: 600; font-size: 11px; letter-spacing: 0.25em; color: var(--cyan); }
+h1 { font-size: 30px; margin: 8px 0 6px; } h2 { font-size: 18px; margin: 0; } .muted { color: var(--silver); }
+.card { background: var(--midnight); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 16px 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.stat { background: rgba(31, 139, 255, 0.08); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.stat-label { color: var(--silver); font-size: 13px; } .stat-value { font-size: 24px; font-weight: 800; } .stat-note { color: var(--silver); font-size: 12px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); }
+.badge-ok { color: var(--ok); border-color: var(--ok); } .badge-warn { color: var(--warn); border-color: var(--warn); } .badge-stop { color: var(--stop); border-color: var(--stop); } .badge-brand { color: var(--cyan); border-color: var(--cyan); }
+.banner { border-radius: 10px; padding: 12px 14px; margin: 12px 0; border: 1px solid var(--line); }
+.banner-info { background: rgba(41, 195, 255, 0.08); } .banner-warn { background: rgba(245, 158, 11, 0.12); border-color: var(--warn); } .banner-stop { background: rgba(239, 68, 68, 0.12); border-color: var(--stop); }
+button, .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: var(--blue); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; text-decoration: none; }
+button.ghost, .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--white); }
+button:disabled { opacity: 0.5; cursor: default; }
+input, select, textarea { min-height: 44px; width: 100%; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--navy); color: var(--white); font: inherit; }
+label { display: block; font-size: 13px; color: var(--silver); margin: 8px 0 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; } th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); } th { color: var(--silver); font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.tiers { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.legal { max-width: 800px; } .legal blockquote { border-left: 3px solid var(--warn); margin: 8px 0; padding: 4px 12px; color: var(--silver); }
+@media (max-width: 600px) { h1 { font-size: 24px; } }

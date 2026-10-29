@@ -1,33 +1,25 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { cloverConfig } from '@/lib/clover/config';
+import { after, type NextRequest } from 'next/server';
+import { adminAuthorized } from '@/lib/core/admin';
+import { fail, ok } from '@/lib/core/http';
+import { getStore } from '@/lib/core/store';
+import { dispatchWebhook, VERIFICATION_KEY, webhookGate } from '@/lib/clover/webhook';
+import { hooks } from '@/lib/domain';
+import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// Webhook de l'app « M4RKETING by TAKATAK » (Clover Developer Dashboard → app → Webhooks).
-// Modèle : TAKATAK Food Hub (dépôt foodhubca, app/api/foodhub/webhooks/clover/route.ts).
-//  1. Clover POST d'abord { verificationCode } : le journaliser et le coller dans le
-//     Developer Dashboard pour activer le webhook (le code lui-même n'est jamais commité).
-//  2. Chaque événement porte l'en-tête X-Clover-Auth = le code d'auth du webhook
-//     → variable d'environnement CLOVER_WEBHOOK_AUTH. Rejeter tout le reste.
-//  3. Événements abonnés pour cette app : `C`, `O`, `I`, `A`.
-//     Préfixes Clover : A=app (désinstallation → purger les jetons du marchand),
-//     O=commandes, P=paiements, I=inventaire, C=clients, E=employés, M=marchand, CA=caisse.
+// Clover → this app (see lib/clover/webhook.ts). Answers at once; the events are handled right after the answer.
 export async function POST(req: NextRequest) {
   const raw = await req.text();
-  let body: Record<string, unknown>;
-  try { body = JSON.parse(raw); } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
+  if (raw.length > 512 * 1024) return fail('Too large', 413);
+  const gate = await webhookGate(raw, req.headers.get('x-clover-auth'));
+  if (gate.done) return NextResponse.json(gate.json, { status: gate.status });
+  after(() => dispatchWebhook(gate.body, hooks).catch((e) => console.error('[webhook] dispatch failed', e instanceof Error ? e.message : e)));
+  return ok();
+}
 
-  if (typeof body.verificationCode === 'string') {
-    // TODO: journaliser le code (une fois) pour le coller dans le Developer Dashboard.
-    console.log('[clover-webhook] verificationCode received (paste it in the Developer Dashboard)');
-    return NextResponse.json({ ok: true });
-  }
-
-  if (!cloverConfig.webhookAuth || req.headers.get('x-clover-auth') !== cloverConfig.webhookAuth) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
-
-  // TODO: dispatcher par préfixe de clé d'événement vers les handlers de l'app.
-  // TODO: traiter en arrière-plan et répondre vite (Clover réessaie sur lenteur).
-  return NextResponse.json({ ok: true });
+// Operator: the last verification code Clover sent (Authorization: Bearer ADMIN_TOKEN).
+export async function GET(req: NextRequest) {
+  if (!adminAuthorized(req)) return fail('Unauthorized', 401);
+  return ok({ verification: await getStore().getKv(VERIFICATION_KEY) });
 }
