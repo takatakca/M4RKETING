@@ -35,3 +35,24 @@ Customers R/W · Inventory R/W (rabais) · Orders R · Merchant R
 
 Cette application fait partie de la suite TAKATAK sur Clover : toutes les apps partagent le même dos d'événements (webhooks Clover), le même **client unique reconnu par son numéro de téléphone** (+ courriel), et les mêmes commandes et paiements Clover. Aucune app ne vit en silo : les données qu'elle produit alimentent les autres apps de la suite (voir « Clover API — Main Stuff — Robot Notepad », section 3, déposé au Drive Opérations et dans `~/workspace/clover-apps/`).
 
+
+## État du code (2026-10-28)
+
+Application Next.js 16 qui fonctionne (tests verts, build OK). Mise en ligne : `DEPLOY.md` § 5.
+
+**Ce qui marche :**
+- **Commun (kit Suite TAKATAK, identique dans les 9 apps)** : connexion Clover OAuth v2 (jetons scellés, rafraîchis
+  seuls, supprimés à la désinstallation) · webhook Clover (vérification, X-Clover-Auth, chaque événement une fois) ·
+  base PostgreSQL (ou mémoire en dev) · session marchand · paliers Base / Premium / VIP lus depuis la facturation
+  Clover (`OWN_MERCHANTS` = VIP) · marchand `RNVTBYMCKXEJ1` en lecture seule · lien Suite TAKATAK avec Food Hub ·
+  page d'accueil FR/EN, tableau de bord `/app`, pages légales `/legal/*`, `/api/health`, `/api/cron`, clés d'appareils.
+- Segments depuis les commandes Clover des 180 derniers jours : nouveaux, réguliers, à relancer, perdus
+- Rabais Clover gérés par l'app (préfixe « M4 · » — les autres rabais ne sont jamais touchés) et leur utilisation
+- Premium : campagnes en brouillon approuvées par une personne ; export CSV de l'audience **avec consentement
+  marketing Clover seulement**. Rien n'est envoyé par l'app.
+
+**Ce qui reste :**
+- Campagnes déclenchées par événements, offres à la caisse / borne, brouillons IA (VIP, approbation humaine).
+
+**Développer :** `npm install` · `npm run dev` · `npm run typecheck` · `npm test` · `npm run build`. Règles pour
+les agents : `AGENTS.md` ; journal : `WORKLOG.md`.
