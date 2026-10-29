@@ -4,8 +4,14 @@
 //   FOODHUB_SUITE_SECRET  32+ characters; the same value as FOODHUB_SUITE_<APP>_SECRET in Food Hub
 // Food Hub POSTs signed events to APP_BASE_URL/api/suite/events; this app signs its own calls the same way:
 //   X-Takatak-Signature: t=<unix s>,v1=<hex HMAC-SHA256(secret, "<t>.<body or path+query>")>, 5-minute window.
+//
+// Food Hub also keeps the suite's directory: which TAKATAK apps each restaurant has. This app tells it when a merchant
+// connects ("<app>.installed", with this app's address) or uninstalls ("<app>.uninstalled"), and reads the directory
+// for its Suite page and app switcher (GET /api/suite/v1/directory?merchant=…, kept 5 minutes).
 import crypto from 'node:crypto';
 import { APP } from './app';
+import { cloverConfig } from './clover/config';
+import { getMerchant, listMerchants } from './clover/oauth';
 import { hmacHex, safeEqual } from './core/crypto';
 import { getStore } from './core/store';
 import type { AppHooks, SuiteEvent } from './hooks';
@@ -47,7 +53,26 @@ export async function receiveSuiteEvent(raw: string, signature: string | null, h
     await getStore().deleteKv(`suite:in:${ev.id}`); // let Food Hub's retry try again
     return { status: 500, json: { ok: false, error: e instanceof Error ? e.message : String(e) } };
   }
+  if (ev.type === 'app.event' && /\.(un)?installed$/.test(String(ev.data?.type ?? ''))) directoryCache.delete(String(ev.data?.data?.cloverMerchantId ?? ''));
+  await bump('received');
   return { status: 200, json: { ok: true } };
+}
+
+// ---- counters for the Suite page ----
+const STATS = 'suite:stats';
+export interface SuiteStats { received: number; emitted: number; lastReceivedAt: string | null; lastEmittedAt: string | null }
+
+async function bump(kind: 'received' | 'emitted'): Promise<void> {
+  const store = getStore();
+  const cur = (await store.getKv<SuiteStats>(STATS)) ?? { received: 0, emitted: 0, lastReceivedAt: null, lastEmittedAt: null };
+  const at = new Date().toISOString();
+  await store.setKv(STATS, kind === 'received' ? { ...cur, received: cur.received + 1, lastReceivedAt: at } : { ...cur, emitted: cur.emitted + 1, lastEmittedAt: at });
+}
+
+export async function suiteStats(): Promise<SuiteStats & { waiting: number }> {
+  const store = getStore();
+  const cur = (await store.getKv<SuiteStats>(STATS)) ?? { received: 0, emitted: 0, lastReceivedAt: null, lastEmittedAt: null };
+  return { ...cur, waiting: (await store.list('suite_outbox', { limit: 1000 })).length };
 }
 
 /** This app → the other suite apps (through Food Hub). Type must be "<app key>.<name>". Kept for retry when it fails. */
@@ -60,7 +85,7 @@ export async function emitSuite(name: string, data: unknown, id: string = crypto
       method: 'POST', headers: { 'content-type': 'application/json', 'x-takatak-app': APP.key, 'x-takatak-signature': signSuite(cfg.secret, body) }, body,
       signal: AbortSignal.timeout(8000),
     });
-    if (res.ok) return { sent: true };
+    if (res.ok) { await bump('emitted'); return { sent: true }; }
     if (res.status >= 400 && res.status < 500 && res.status !== 429) return { sent: false, reason: `Food Hub refused it (HTTP ${res.status})` };
   } catch { /* kept below */ }
   await getStore().put('suite_outbox', id, '_suite', { body, tries: 1 });
@@ -80,7 +105,7 @@ export async function flushSuiteOutbox(): Promise<{ sent: number; left: number }
         method: 'POST', headers: { 'content-type': 'application/json', 'x-takatak-app': APP.key, 'x-takatak-signature': signSuite(cfg.secret, d.data.body) }, body: d.data.body,
         signal: AbortSignal.timeout(8000),
       });
-      if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) { await store.remove('suite_outbox', d.id); if (res.ok) sent++; continue; }
+      if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) { await store.remove('suite_outbox', d.id); if (res.ok) { sent++; await bump('emitted'); } continue; }
     } catch { /* retry next time */ }
     if (d.data.tries >= 50) await store.remove('suite_outbox', d.id);
     else await store.put('suite_outbox', d.id, '_suite', { ...d.data, tries: d.data.tries + 1 }, d.at);
@@ -101,3 +126,70 @@ export async function suiteOrders(since?: string): Promise<{ ok: boolean; orders
     return { ok: false, orders: [], error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+// ---- the suite directory (kept by Food Hub) ----
+const announcedKey = (mid: string) => `m:${mid}:suite:announced`;
+const triedKey = (mid: string) => `m:${mid}:suite:announce-tried`;
+
+/** Tell the suite this merchant has this app (once per installation; retried by /api/cron). */
+export async function announceInstall(merchantId: string): Promise<{ sent: boolean; reason?: string }> {
+  const m = await getMerchant(merchantId);
+  if (!m || m.status !== 'active') return { sent: false, reason: 'not connected' };
+  const store = getStore();
+  if ((await store.getKv<string>(announcedKey(merchantId))) === m.installedAt) return { sent: true, reason: 'already told' };
+  await store.setKv(triedKey(merchantId), Date.now());
+  const r = await emitSuite('installed', { cloverMerchantId: merchantId, appUrl: cloverConfig.appBaseUrl || null }, `installed:${merchantId}:${m.installedAt}`);
+  if (r.sent || r.reason === 'kept for retry') await store.setKv(announcedKey(merchantId), m.installedAt);
+  return r;
+}
+
+/** Tell the suite this merchant removed this app (Clover webhook A DELETE). */
+export async function announceUninstall(merchantId: string): Promise<{ sent: boolean; reason?: string }> {
+  await getStore().deleteKv(announcedKey(merchantId));
+  directoryCache.delete(merchantId);
+  return emitSuite('uninstalled', { cloverMerchantId: merchantId }, `uninstalled:${merchantId}:${Date.now()}`);
+}
+
+/** /api/cron: merchants not yet in the directory (connected before the link, or Food Hub was down). Hourly per merchant. */
+export async function announceAll(now = Date.now()): Promise<{ sent: number }> {
+  if (!suiteConfig()) return { sent: 0 };
+  const store = getStore();
+  let sent = 0;
+  for (const m of await listMerchants()) {
+    if ((await store.getKv<string>(announcedKey(m.merchantId))) === m.installedAt) continue;
+    if (now - Number((await store.getKv<number>(triedKey(m.merchantId))) ?? 0) < 3600_000) continue;
+    if ((await announceInstall(m.merchantId)).sent) sent++;
+  }
+  return { sent };
+}
+
+export interface DirectoryEntry { key: string; installed: boolean; url: string | null; at: string | null }
+const DIRECTORY_TTL_MS = 5 * 60_000;
+const DIRECTORY_RETRY_MS = 60_000;
+// `until`: when to ask Food Hub again. A failure keeps the last good answer (or none) for a minute, so a Food Hub
+// outage never slows every page of this app down.
+const directoryCache = new Map<string, { until: number; apps: DirectoryEntry[] | null }>();
+
+/** Which suite apps this restaurant has, from Food Hub (null when this app is not connected or Food Hub is down). */
+export async function suiteDirectory(merchantId: string, now = Date.now()): Promise<DirectoryEntry[] | null> {
+  const cfg = suiteConfig();
+  if (!cfg || !merchantId) return null;
+  const hit = directoryCache.get(merchantId);
+  if (hit && now < hit.until) return hit.apps;
+  const path = `/api/suite/v1/directory?merchant=${encodeURIComponent(merchantId)}`;
+  const failed = () => { directoryCache.set(merchantId, { until: now + DIRECTORY_RETRY_MS, apps: hit?.apps ?? null }); return hit?.apps ?? null; };
+  try {
+    const res = await fetch(`${cfg.url}${path}`, { headers: { 'x-takatak-app': APP.key, 'x-takatak-signature': signSuite(cfg.secret, path) }, signal: AbortSignal.timeout(5000) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(j.apps)) return failed();
+    const apps: DirectoryEntry[] = j.apps
+      .filter((a: any) => a && typeof a.key === 'string')
+      .map((a: any) => ({ key: a.key, installed: a.installed === true, url: typeof a.url === 'string' && /^https?:\/\//.test(a.url) ? a.url : null, at: typeof a.at === 'string' ? a.at : null }));
+    directoryCache.set(merchantId, { until: now + DIRECTORY_TTL_MS, apps });
+    return apps;
+  } catch {
+    return failed();
+  }
+}
+
+export const clearDirectoryCache = () => directoryCache.clear();

@@ -20,11 +20,13 @@ LOY4LTY, REW4RDS, CH4T). Each one works alone; together they talk through TAKATA
 ## Hard rules
 
 - **Public repository:** never commit secrets, tokens, `.env` values, merchant or customer data, support case numbers.
-- **Shared kit:** `lib/core/`, `lib/clover/`, `lib/suite.ts`, `lib/hooks.ts`, `lib/app.ts`, `app/api/clover/`,
-  `app/api/suite/`, `app/api/health/`, `app/api/cron/`, `app/api/devices/`, `components/ui.tsx`, `components/ApiForm.tsx`,
-  `components/DeviceKeys.tsx`, `tests/kit.test.ts`, `tests/menu.test.ts`, `tests/helpers.ts` are **identical in all nine
-  repos**. Change them in all nine at once (same commit message), or not at all. This app's own code lives in
-  `lib/domain/`, `components/Panel.tsx` and its own `app/api/*` routes.
+- **Shared kit:** `lib/core/`, `lib/clover/`, `lib/suite.ts`, `lib/suite-catalog.ts`, `lib/nav.ts`, `lib/hooks.ts`,
+  `lib/app.ts`, `lib/legal.ts`, `app/api/{clover,suite,health,cron,devices,session,account}/`, `app/app/`, `app/page.tsx`,
+  `app/layout.tsx`, `app/globals.css`, `app/legal/`, `components/` (all but `Panel.tsx` and this app's own client
+  components), `tests/kit.test.ts`, `tests/menu.test.ts`, `tests/helpers.ts`, `docs/SUITE_KIT.md` are **identical in all
+  nine repos**. Change them in all nine at once (same commit message), or not at all. This app's own code lives in
+  `lib/domain/` (its `index.ts` declares the menu sections, authorized actions, device kinds and plan features),
+  `components/Panel.tsx` and its own `app/api/*` routes. How it all fits: `docs/SUITE_KIT.md`.
 - **Merchant `RNVTBYMCKXEJ1` (dormant On2GO.ca) is read-only** (`NEVER_WRITE_MERCHANTS`). Never write to it.
 - Clover tokens are sealed with `TOKEN_ENCRYPTION_KEY`; never log or return them.
 - Brand: `BRAND.md` (electric blue on deep navy; green/amber/red for status only). French first, English alongside.

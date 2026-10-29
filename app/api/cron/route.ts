@@ -1,7 +1,8 @@
 import { adminAuthorized } from '@/lib/core/admin';
+import { purgeAudit } from '@/lib/core/audit';
 import { fail, ok } from '@/lib/core/http';
 import { hooks } from '@/lib/domain';
-import { flushSuiteOutbox } from '@/lib/suite';
+import { announceAll, flushSuiteOutbox } from '@/lib/suite';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   if (!adminAuthorized(req)) return fail('Unauthorized', 401);
   const suite = await flushSuiteOutbox().catch((e) => ({ error: String(e) }));
+  const directory = await announceAll().catch((e) => ({ error: String(e) }));
+  const audit = await purgeAudit().catch((e) => ({ error: String(e) }));
   const app = await hooks.tick?.().catch((e) => ({ error: e instanceof Error ? e.message : String(e) }));
-  return ok({ suite, app: app ?? null });
+  return ok({ suite, directory, auditPurged: audit, app: app ?? null });
 }

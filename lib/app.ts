@@ -11,6 +11,8 @@ const c = config as Config;
 export const APP = {
   key: c.key,
   name: c.name,
+  /** The name without " by TAKATAK" (menus, where GROUPE TAKATAK already shows under it). */
+  short: c.name.replace(/\s+by\s+TAKATAK$/i, ''),
   cloverAppId: (process.env.CLOVER_APP_ID ?? '').trim() || c.cloverAppId,
   summaryFr: c.summaryFr ?? '',
   summaryEn: c.summaryEn ?? '',

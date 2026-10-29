@@ -21,6 +21,10 @@ export interface Store {
   remove(collection: string, id: string): Promise<void>;
   /** Every record of one merchant (app uninstalled, or the merchant asked for deletion). */
   purgeMerchant(merchantId: string): Promise<void>;
+  /** How many records of one merchant, by collection (Account → Security and data). */
+  merchantCounts(merchantId: string): Promise<Record<string, number>>;
+  /** One merchant's records, every collection, newest first (data export). */
+  merchantDocs(merchantId: string, limit?: number): Promise<Doc[]>;
 }
 
 const clone = <T,>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
@@ -53,6 +57,14 @@ function memoryStore(): Store {
     async purgeMerchant(merchantId) {
       for (const [key, d] of docs) if (d.merchantId === merchantId) docs.delete(key);
       for (const key of [...kv.keys()]) if (key.startsWith(`m:${merchantId}:`)) kv.delete(key);
+    },
+    async merchantCounts(merchantId) {
+      const out: Record<string, number> = {};
+      for (const d of docs.values()) if (d.merchantId === merchantId) out[d.collection] = (out[d.collection] ?? 0) + 1;
+      return out;
+    },
+    async merchantDocs(merchantId, limit = 10_000) {
+      return [...docs.values()].filter((d) => d.merchantId === merchantId).sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit).map((d) => clone(d));
     },
   };
 }
@@ -107,6 +119,14 @@ function pgStore(url: string): Store {
       const p = await db();
       await p.query('DELETE FROM app_docs WHERE merchant_id = $1', [merchantId]);
       await p.query('DELETE FROM app_kv WHERE key LIKE $1', [`m:${merchantId}:%`]);
+    },
+    async merchantCounts(merchantId) {
+      const r = await (await db()).query('SELECT collection, count(*)::int AS n FROM app_docs WHERE merchant_id = $1 GROUP BY collection', [merchantId]);
+      return Object.fromEntries(r.rows.map((x) => [x.collection, Number(x.n)]));
+    },
+    async merchantDocs(merchantId, limit = 10_000) {
+      const r = await (await db()).query('SELECT * FROM app_docs WHERE merchant_id = $1 ORDER BY at DESC LIMIT $2', [merchantId, Math.min(limit, 50_000)]);
+      return r.rows.map((x) => row(x));
     },
   };
 }

@@ -10,6 +10,7 @@
 import crypto from 'node:crypto';
 import { APP, ownMerchants, tierFromPlan, type Tier } from '../app';
 import { hmacHex, openSecret, safeEqual, sealSecret } from '../core/crypto';
+import { roleFromClover, type Role } from '../core/roles';
 import { getStore } from '../core/store';
 import { cloverConfig, cloverConfigured, redirectUri } from './config';
 import { cloverFetch } from './http';
@@ -158,6 +159,16 @@ export async function accessToken(merchantId: string, opts: { force?: boolean } 
   })().finally(() => locks.delete(merchantId));
   locks.set(merchantId, job);
   return job;
+}
+
+/** The person who opened the app: name and Clover role (null when Clover does not share employees with this app). */
+export async function readEmployee(merchantId: string, employeeId: string | null | undefined): Promise<{ name: string | null; role: Role | null } | null> {
+  if (!employeeId || !MERCHANT_ID.test(employeeId)) return null;
+  const token = await accessToken(merchantId);
+  if (!token) return null;
+  const j = await getJson(token, `/v3/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}`);
+  if (!j || typeof j !== 'object') return null;
+  return { name: typeof j.name === 'string' && j.name.trim() ? j.name.trim().slice(0, 60) : null, role: roleFromClover(j) };
 }
 
 /** App uninstalled: tokens are deleted at once. The app's own records stay (some are legal records, e.g. gift cards). */

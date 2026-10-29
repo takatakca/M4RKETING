@@ -9,6 +9,7 @@ import { APP } from '../app';
 import { safeEqual } from '../core/crypto';
 import { getStore } from '../core/store';
 import { cloverConfig } from './config';
+import { announceUninstall } from '../suite';
 import { disconnectMerchant, getMerchant, refreshBilling } from './oauth';
 
 export const VERIFICATION_KEY = 'clover:webhook-verification';
@@ -45,7 +46,10 @@ export async function dispatchWebhook(body: any, hooks: AppHooks): Promise<{ han
       const ts = Number.isFinite(Number(ev?.ts)) ? Number(ev.ts) : null;
       if (!prefix || !(await store.claim(`m:${merchantId}:wh:${prefix}:${objectId}:${type}:${ts ?? ''}`, Date.now()))) { out.skipped++; continue; }
       if (prefix === 'A') {
-        if (type === 'DELETE' && (await disconnectMerchant(merchantId))) out.uninstalled.push(merchantId);
+        if (type === 'DELETE' && (await disconnectMerchant(merchantId))) {
+          out.uninstalled.push(merchantId);
+          await announceUninstall(merchantId).catch(() => null);
+        }
         else if (type === 'UPDATE') await refreshBilling(merchantId).catch(() => null);
         out.handled++;
         continue;
