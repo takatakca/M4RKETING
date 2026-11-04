@@ -76,3 +76,27 @@ with the same message in each. `tests/kit.test.ts` also checks that the app plug
    `requireMerchant(req, tier, { action: 'app.verb' })`. It shows in Account → Authorized actions by itself.
 4. Plan content: update `tierFeatures` (what works today; roadmap lines start with « Bientôt : » / "Coming:").
 5. Checks before every push: `npm run typecheck` · `npm test` · `npm run build`.
+
+## 6. Authoritative merchant identity and shared checksums
+
+The OAuth code exchange alone does not confirm the callback's merchant id. Before reading billing or saving installation credentials, `finishConnect` reads Clover's merchant response and requires a non-array object whose string `id` exactly equals the requested merchant id. Unavailable, malformed, missing or mismatched identities refuse the connection; existing records, credentials and installation timestamps remain unchanged. Matching identities continue through the existing billing/sealed-token flow. This does not alter employee-role policy.
+
+The shared regression fixture returns an authoritative matching id for each valid synthetic merchant. Tests override it for unavailable/malformed/mismatched responses and verify that neither billing reads nor installation writes occur, for both new and existing installations.
+
+After a kit change, run typecheck, tests and production build in each app, then compare SHA256 for every changed shared path. From the parent directory containing the nine review checkouts:
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+from hashlib import sha256
+repos = ['C4ISSE', 'T4CTILE', '4CCOUNTING', 'TR4CKER', 'ST4FF', 'M4RKETING', 'LOY4LTY', 'REW4RD', 'CH4T']
+shared = ['lib/clover/oauth.ts', 'tests/kit.test.ts', 'tests/helpers.ts', 'docs/SUITE_KIT.md']
+for name in shared:
+    hashes = {repo: sha256((Path(repo) / name).read_bytes()).hexdigest() for repo in repos}
+    if len(set(hashes.values())) != 1:
+        raise SystemExit(f'Kit mismatch: {name}: {hashes}')
+    print(f'{name}: {next(iter(hashes.values()))} (all nine match)')
+PY
+```
+
+Update the `shared` list for the complete set of kit files changed in a future change. Keep the shared file bytes and commit message identical in all nine apps. App-specific work logs and features are outside this checksum set. The checks use isolated test transports; they do not certify live Clover credentials, installations or production deployment.

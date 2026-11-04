@@ -115,6 +115,68 @@ describe('Clover OAuth', () => {
   });
 });
 
+const unverifiedMerchants: Array<[string, () => Response | Promise<Response>]> = [
+  ['unavailable HTTP response', () => json({ error: 'unavailable' }, 503)],
+  ['network failure', async () => { throw new Error('Synthetic merchant read failure'); }],
+  ['invalid JSON', () => new Response('not-json', { headers: { 'content-type': 'application/json' } })],
+  ['null body', () => json(null)],
+  ['non-object body', () => json(MID)],
+  ['array body', () => json([{ id: MID }])],
+  ['missing identity', () => json({ name: 'Unconfirmed restaurant' })],
+  ['non-string identity', () => json({ id: 123 })],
+  ['different merchant', () => json({ id: 'MERCHANT0002', name: 'Other restaurant' })],
+  ['identity with extra whitespace', () => json({ id: `${MID} ` })],
+];
+
+describe.each([false, true])('authoritative Clover merchant identity (existing installation: %s)', (existing) => {
+  it.each(unverifiedMerchants)('refuses %s before billing or credential writes', async (_label, response) => {
+    process.env.TOKEN_ENCRYPTION_KEY = 'a'.repeat(64);
+    if (existing) expect((await finishConnect({ code: 'original-code', merchantId: MID })).ok).toBe(true);
+    const store = getStore();
+    const before = await store.get('_merchants', MID);
+    if (existing) expect(JSON.stringify(before)).toContain('enc:v1:');
+    const mark = calls.length;
+    const original = responder;
+    responder = (url, init) => {
+      if (url.endsWith('/oauth/v2/token')) return json({ access_token: 'AT-UNVERIFIED', refresh_token: 'RT-UNVERIFIED' });
+      if (url.endsWith(`/v3/merchants/${MID}`)) return response();
+      return original(url, init);
+    };
+    const writes = vi.spyOn(store, 'put');
+    const result = await finishConnect({ code: 'new-code', merchantId: MID });
+    const writeCount = writes.mock.calls.length;
+    writes.mockRestore();
+    expect(result).toMatchObject({ ok: false, code: 'bad_merchant' });
+    expect(JSON.stringify(result)).not.toMatch(/AT-UNVERIFIED|RT-UNVERIFIED/);
+    expect(calls.slice(mark).some((call) => call.url.includes('/billing_info'))).toBe(false);
+    expect(writeCount).toBe(0);
+    // Includes the stored timestamp, sealed credentials, subscription and install state.
+    expect(await store.get('_merchants', MID)).toEqual(before);
+    expect(await store.get('_merchants', 'MERCHANT0002')).toBeNull();
+  });
+});
+
+describe('confirmed Clover merchant identity', () => {
+  it('waits for the matching merchant before reading billing or saving an installation', async () => {
+    let confirm: ((value: Response) => void) | undefined;
+    const original = responder;
+    responder = (url, init) => url.endsWith(`/v3/merchants/${MID}`)
+      ? new Promise<Response>((resolve) => { confirm = resolve; })
+      : original(url, init);
+    const pending = finishConnect({ code: 'confirmed-code', merchantId: MID });
+    await vi.waitFor(() => expect(confirm).toBeTypeOf('function'));
+    const prematureBilling = calls.some((call) => call.url.includes('/billing_info'));
+    const prematureInstall = await getMerchant(MID);
+    confirm!(json({ id: MID, name: 'Confirmed restaurant' }));
+    expect(await pending).toEqual({ ok: true, merchantId: MID, name: 'Confirmed restaurant' });
+    expect(prematureBilling).toBe(false);
+    expect(prematureInstall).toBeNull();
+    expect(calls.filter((call) => call.url.includes('/billing_info'))).toHaveLength(1);
+    expect(await getMerchant(MID)).toMatchObject({ merchantId: MID, name: 'Confirmed restaurant', status: 'active', billing: { plan: 'Premium' } });
+    expect(await accessToken(MID)).toBe('AT-1');
+  });
+});
+
 describe('Clover webhook', () => {
   it('keeps the verification code, refuses a wrong auth code, handles each event once, uninstall deletes tokens', async () => {
     expect((await webhookGate('{"verificationCode":"V-123"}', null))).toMatchObject({ done: true, status: 200 });

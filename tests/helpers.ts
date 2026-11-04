@@ -27,7 +27,8 @@ export function fakeClover(routes: Route[] = []) {
       if (out !== undefined) return json(out);
     }
     if (url.pathname.endsWith('/billing_info')) return json({ status: 'ACTIVE', appSubscription: { name: 'VIP' } });
-    if (url.pathname === `/v3/merchants/${MID}`) return json({ id: MID, name: 'Test Resto' });
+    const merchant = /^\/v3\/merchants\/([A-Z0-9]{8,20})$/.exec(url.pathname);
+    if (merchant) return json({ id: merchant[1], name: 'Test Resto' });
     return json({ elements: [] });
   }));
   return calls;

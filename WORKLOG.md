@@ -1,3 +1,4 @@
+- 2026-11-04 | Codex shared-kit continuation @ cloud | feature/foodhub-campaign-workflows → review branch | source/checks done | authoritative Clover merchant-id match required before billing or credential writes; unavailable/malformed/mismatched response preserves installed records; 21 shared regressions, typecheck + 73 tests + normal production build pass; four shared path SHA256 values match all nine review sources; existing app workflow preserved | next: owner review/PR and real authorized Clover acceptance; no production deployment — signé : Codex @ Codex cloud · 2026-11-04
 # Work log
 
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
