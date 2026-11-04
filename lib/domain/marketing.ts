@@ -5,10 +5,8 @@
 //  - Campaigns (Premium): a draft (segment + discount + message) that a person approves. Nothing is sent from here:
 //    the audience export lists only customers who accepted marketing in Clover (marketingAllowed).
 //  - Measure: orders that used the campaign's discount.
-import crypto from 'node:crypto';
 import { cloverDelete, cloverGetAll, cloverPost, mpath } from '../clover/api';
 import { normalizePhone } from '../core/phone';
-import { getStore } from '../core/store';
 
 export type Segment = 'new' | 'regular' | 'lapsing' | 'lost';
 export const SEGMENTS: Segment[] = ['new', 'regular', 'lapsing', 'lost'];
@@ -74,30 +72,9 @@ export async function deleteDiscount(mid: string, id: string): Promise<{ ok: boo
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }
 
-// ---- campaigns (Premium) ----
-export interface Campaign { id: string; name: string; segment: Segment; discountName: string | null; messageFr: string; messageEn: string; status: 'draft' | 'approved'; createdAt: string; approvedBy: string | null }
-export const CAMPAIGNS = 'campaigns';
-
-export async function saveCampaign(mid: string, input: Record<string, unknown>): Promise<{ ok: true; campaign: Campaign } | { ok: false; error: string }> {
-  const segment = String(input.segment ?? '') as Segment;
-  if (!SEGMENTS.includes(segment)) return { ok: false, error: 'Choose a segment.' };
-  const name = String(input.name ?? '').trim().slice(0, 60);
-  if (!name) return { ok: false, error: 'Name the campaign.' };
-  const c: Campaign = { id: crypto.randomUUID(), name, segment, discountName: input.discountName ? String(input.discountName).slice(0, 60) : null, messageFr: String(input.messageFr ?? '').slice(0, 320), messageEn: String(input.messageEn ?? '').slice(0, 320), status: 'draft', createdAt: new Date().toISOString(), approvedBy: null };
-  await getStore().put(CAMPAIGNS, c.id, mid, c, c.createdAt);
-  return { ok: true, campaign: c };
-}
-
-export async function approveCampaign(mid: string, id: string, by: string): Promise<boolean> {
-  const d = await getStore().get<Campaign>(CAMPAIGNS, id);
-  if (!d || d.merchantId !== mid || d.data.status === 'approved') return false;
-  await getStore().put(CAMPAIGNS, id, mid, { ...d.data, status: 'approved', approvedBy: by.slice(0, 60) }, d.at);
-  return true;
-}
-
-export async function listCampaigns(mid: string): Promise<Campaign[]> {
-  return (await getStore().list<Campaign>(CAMPAIGNS, { merchantId: mid, limit: 200 })).map((d) => d.data);
-}
+// Campaign approval/export is bound to a version and current merchant-owned Clover discount.
+export { CAMPAIGNS, saveCampaign, updateCampaign, previewCampaign, approveCampaign, listCampaigns, campaignAudienceCsv } from './campaigns';
+export type { Campaign, CampaignPreview } from './campaigns';
 
 /** Audience CSV: only customers who accepted marketing in Clover, with their phone / email. */
 export async function audienceCsv(mid: string, segment: Segment): Promise<{ ok: true; csv: string; count: number } | { ok: false; error: string }> {

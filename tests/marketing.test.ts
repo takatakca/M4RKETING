@@ -1,6 +1,6 @@
 // M4RKETING: segments from Clover orders, own discounts only, consent-only export, campaign approval.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { approveCampaign, audienceCsv, createDiscount, customerStats, deleteDiscount, listCampaigns, saveCampaign, segmentCounts, segmentOf } from '@/lib/domain/marketing';
+import { approveCampaign, audienceCsv, createDiscount, customerStats, deleteDiscount, listCampaigns, previewCampaign, saveCampaign, segmentCounts, segmentOf } from '@/lib/domain/marketing';
 import { connect, fakeClover, MID } from './helpers';
 
 const DAY = 86400_000;
@@ -54,12 +54,14 @@ describe('marketing', () => {
   });
 
   it('campaigns are drafts until a person approves them', async () => {
-    const c = await saveCampaign(MID, { name: 'Reviens', segment: 'lapsing', discountName: 'M4 · Retour' });
+    const c = await saveCampaign(MID, { name: 'Reviens', segment: 'lapsing', discountName: 'M4 · Retour', messageFr: 'Découvrez notre offre de retour.' });
     if (!c.ok) throw new Error(c.error);
     expect(c.campaign.status).toBe('draft');
-    expect(await approveCampaign(MID, c.campaign.id, 'Matt')).toBe(true);
-    expect(await approveCampaign(MID, c.campaign.id, 'Matt')).toBe(false);
-    expect((await listCampaigns(MID))[0]).toMatchObject({ status: 'approved', approvedBy: 'Matt' });
+    const reviewed = await previewCampaign(MID, c.campaign.id);
+    if (!reviewed.ok) throw new Error(reviewed.error);
+    expect(await approveCampaign(MID, c.campaign.id, 'Owner', reviewed.preview.configurationHash)).toMatchObject({ ok: true });
+    expect(await approveCampaign(MID, c.campaign.id, 'Owner', reviewed.preview.configurationHash)).toMatchObject({ ok: false, code: 'already_approved' });
+    expect((await listCampaigns(MID))[0]).toMatchObject({ status: 'approved', approvedBy: 'Owner' });
     expect(await saveCampaign(MID, { name: 'x', segment: 'all' })).toMatchObject({ ok: false });
   });
 });
