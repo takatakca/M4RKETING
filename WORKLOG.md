@@ -1,3 +1,5 @@
+2026-11-04 | Codex coordinator @ cloud | feature/foodhub-campaign-workflows | verified | refreshed actual PostgreSQL/browser campaign evidence after the shared merchant identity guard:9checks,2simultaneous app processes,0external messages/providerwrites | next: review branch and existing native deployment flow. — signé : Codex @ Codex cloud · 2026-11-04
+
 - 2026-11-04 | Codex shared-kit continuation @ cloud | feature/foodhub-campaign-workflows → review branch | source/checks done | authoritative Clover merchant-id match required before billing or credential writes; unavailable/malformed/mismatched response preserves installed records; 21 shared regressions, typecheck + 73 tests + normal production build pass; four shared path SHA256 values match all nine review sources; existing app workflow preserved | next: owner review/PR and real authorized Clover acceptance; no production deployment — signé : Codex @ Codex cloud · 2026-11-04
 # Work log
 

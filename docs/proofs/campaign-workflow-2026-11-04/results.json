@@ -3,7 +3,7 @@
   "checksPassed": 9,
   "checks": [
     "actual merchant browser creates a draft and previews the current Clover offer and counts without contact details; unapproved and legacy segment exports are denied",
-    "actual sessions enforce manager/admin approval/export boundaries and deny another merchant\u2019s campaign",
+    "actual sessions enforce manager/admin approval/export boundaries and deny another merchant’s campaign",
     "human approval of the reviewed version enables a real CSV download containing only the current consenting contact",
     "consent withdrawal after approval is honored on the next export without a cached contact leak",
     "editing the campaign clears its approval; the old preview and old export are both refused",
@@ -19,6 +19,6 @@
   "providerWrites": 0,
   "externalMessages": 0,
   "pageErrors": [],
-  "buildId": "bRiPF12Jcd5AOsURqYOoY",
+  "buildId": "b2siEtry9F116sazCYQai",
   "productionVerified": false
 }
