@@ -104,10 +104,13 @@ async function Campaigns({ ctx, selectedId }: { ctx: PageCtx; selectedId?: strin
   );
 }
 
-async function CampaignReview({ ctx, campaign, discounts }: { ctx: PageCtx; campaign: Campaign; discounts: Array<{ id: string; name: string }> }) {
+export async function CampaignReview({ ctx, campaign: listedCampaign, discounts }: { ctx: PageCtx; campaign: Campaign; discounts: Array<{ id: string; name: string }> }) {
   const { lang, merchantId } = ctx;
-  const result = await previewCampaign(merchantId!, campaign.id);
+  const result = await previewCampaign(merchantId!, listedCampaign.id);
   const preview = result.ok ? result.preview : null;
+  // The list can become stale while the preview reads Clover. Display and edit
+  // the same campaign version whose hash is submitted for approval.
+  const campaign = preview?.campaign ?? listedCampaign;
   return (
     <>
       <Card title={pick(lang, `Vérifier : ${campaign.name}`, `Review: ${campaign.name}`)} icon="check" sub={pick(lang, 'L’approbation porte sur ce message, ce segment et la valeur actuelle du rabais dans Clover.', 'Approval covers this message, this segment and the current Clover discount value.')}>

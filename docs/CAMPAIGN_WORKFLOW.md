@@ -9,3 +9,13 @@ Validation: 52 unit tests, TypeScript and production build passed. The [real Pos
 Reproduce after building with scripts/verify-campaign-workflow.mjs and an isolated local PostgreSQL fixture, following its loopback database guard. Production deployment, live merchant authorization and campaign delivery remain unverified. Shared OAuth identity validation is tracked as a separate required suite update.
 
 — signé : Codex campaign continuation / coordinator @ cloud · 2026-11-04
+
+## Sequential release review — 2026-11-07
+
+The review screen now uses the campaign returned by the fresh preview for its displayed copy, segment, offer, approval and edit revision. A concurrent change after the earlier list read therefore cannot pair old displayed copy with a newer approval hash. French and English rendered-component regressions reproduce the original mismatch and verify the fix; an unavailable preview offers neither approval nor audience export.
+
+Release validation: frozen npm install, Node22 typecheck, all 76 tests in 5 files and production build passed. The two stale-copy regressions failed before the correction and passed afterwards.
+
+The PostgreSQL/browser artifacts above remain historical evidence for their recorded source commit; they are not a new production verification. No customer messages or provider writes were performed during this release review.
+
+Signed: Codex — ChatGPT Work.
