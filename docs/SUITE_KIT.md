@@ -100,3 +100,10 @@ PY
 ```
 
 Update the `shared` list for the complete set of kit files changed in a future change. Keep the shared file bytes and commit message identical in all nine apps. App-specific work logs and features are outside this checksum set. The checks use isolated test transports; they do not certify live Clover credentials, installations or production deployment.
+# Shared release correction — 2026-11-07
+
+Language selection returns a validated relative `Location` with `Cache-Control: no-store`. The browser stays on its current public origin even when Next.js sees an internal container hostname behind a reverse proxy. External, network-path, backslash, control-character, encoded path-separator and oversized return destinations fall back to `/`. The language cookie and valid same-site path/query/fragment are preserved. `tests/session-lang.test.ts` covers the proxy failure and unsafe return paths.
+
+This route, its regression file and this documentation are propagated identically through all nine suite repositories, one repository at a time under the owner's sequential release instruction. No Clover/provider operation is involved.
+
+Signed: Codex — ChatGPT Work.
