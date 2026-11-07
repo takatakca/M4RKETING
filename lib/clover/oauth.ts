@@ -95,7 +95,14 @@ export async function finishConnect(p: { code?: string | null; merchantId?: stri
   const r = await postToken('/oauth/v2/token', { client_id: cloverConfig.clientId, client_secret: cloverConfig.clientSecret, code });
   if (!r.ok || !r.json.access_token) return fail('code_refused', `Clover refused the code (HTTP ${r.status}${r.json.message ? `: ${String(r.json.message).slice(0, 120)}` : ''}).`);
   const token = r.json.access_token;
-  const [merchant, billing] = await Promise.all([getJson(token, `/v3/merchants/${mid}`), readBilling(mid, token)]);
+  const merchant = await getJson(token, `/v3/merchants/${mid}`);
+  // The callback's merchant id is untrusted until Clover confirms the token's
+  // authoritative merchant. Never read billing or replace installation tokens
+  // for a missing, unreadable or different identity.
+  if (!merchant || typeof merchant !== 'object' || Array.isArray(merchant) || typeof merchant.id !== 'string' || merchant.id !== mid) {
+    return fail('bad_merchant', 'Clover could not confirm this merchant. Open the app again from Clover.');
+  }
+  const billing = await readBilling(mid, token);
   const prev = await getMerchant(mid);
   const rec: MerchantRecord = {
     merchantId: mid,

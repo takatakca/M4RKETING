@@ -1,7 +1,7 @@
 import { money, pick } from '@/lib/core/i18n';
 import type { PageCtx } from '@/lib/core/page';
-import { customerStats, listCampaigns, listDiscounts, segmentCounts, SEGMENTS, type Segment } from '@/lib/domain/marketing';
-import { ApiForm } from './ApiForm';
+import { customerStats, listCampaigns, listDiscounts, previewCampaign, segmentCounts, SEGMENTS, type Segment, type Campaign } from '@/lib/domain/marketing';
+import { ApiForm, type Field } from './ApiForm';
 import { Icon } from './icons';
 import { RevokeButton } from './RevokeButton';
 import { Badge, Banner, Bars, Card, Empty, Stat } from './ui';
@@ -13,11 +13,11 @@ const HINT: Record<Segment, [string, string]> = {
   lapsing: ['Pas vus depuis 31 à 90 jours : le bon moment pour un rabais.', 'Not seen for 31 to 90 days: the right time for a discount.'], lost: ['Pas vus depuis plus de 90 jours.', 'Not seen for more than 90 days.'],
 };
 
-export async function Panel({ ctx, section }: { ctx: PageCtx; section: string; query?: Record<string, string> }) {
+export async function Panel({ ctx, section, query = {} }: { ctx: PageCtx; section: string; query?: Record<string, string> }) {
   switch (section) {
     case '': return <Segments ctx={ctx} />;
     case 'discounts': return <Discounts ctx={ctx} />;
-    case 'campaigns': return <Campaigns ctx={ctx} />;
+    case 'campaigns': return <Campaigns ctx={ctx} selectedId={query.campaign} />;
     case 'audience': return <Audience ctx={ctx} />;
     default: return null;
   }
@@ -68,48 +68,95 @@ async function Discounts({ ctx }: { ctx: PageCtx }) {
   );
 }
 
-async function Campaigns({ ctx }: { ctx: PageCtx }) {
+function campaignFields(lang: PageCtx['lang'], discounts: Array<{ id: string; name: string }>, campaign?: Campaign): Field[] {
+  const selected = campaign?.discountId ?? discounts.find((d) => d.name === campaign?.discountName)?.id ?? '';
+  return [
+    { name: 'name', label: pick(lang, 'Nom', 'Name'), required: true, defaultValue: campaign?.name },
+    { name: 'segment', label: 'Segment', type: 'select', defaultValue: campaign?.segment, options: SEGMENTS.map((k) => ({ value: k, label: pick(lang, ...LABEL[k]) })) },
+    { name: 'discountId', label: pick(lang, 'Rabais Clover', 'Clover discount'), type: 'select', defaultValue: selected, options: [{ value: '', label: pick(lang, 'Sans rabais', 'No discount') }, ...discounts.map((x) => ({ value: x.id, label: x.name }))] },
+    { name: 'messageFr', label: pick(lang, 'Message (français)', 'Message (French)'), type: 'textarea', defaultValue: campaign?.messageFr },
+    { name: 'messageEn', label: pick(lang, 'Message (anglais)', 'Message (English)'), type: 'textarea', defaultValue: campaign?.messageEn },
+  ];
+}
+
+async function Campaigns({ ctx, selectedId }: { ctx: PageCtx; selectedId?: string }) {
   const { lang, merchantId } = ctx;
   const [d, campaigns] = await Promise.all([listDiscounts(merchantId!), listCampaigns(merchantId!)]);
+  const selected = selectedId ? campaigns.find((c) => c.id === selectedId) : null;
   return (
     <>
-      <Card title={pick(lang, 'Campagnes', 'Campaigns')} icon="megaphone" sub={pick(lang, 'Un brouillon est approuvé par une personne. Rien n’est envoyé par cette app : exportez l’audience vers votre outil d’envoi.', 'A person approves each draft. Nothing is sent by this app: export the audience to your sending tool.')}>
+      <Card title={pick(lang, 'Campagnes', 'Campaigns')} icon="megaphone" sub={pick(lang, 'Préparez le message, vérifiez le rabais et l’audience, puis faites approuver cette version. Rien n’est envoyé par cette app.', 'Prepare the message, review the discount and audience, then approve that version. Nothing is sent by this app.')}>
         {campaigns.length === 0 ? <Empty icon="megaphone">{pick(lang, 'Aucune campagne pour l’instant.', 'No campaign yet.')}</Empty> : (
           <div className="table-wrap"><table><thead><tr><th>{pick(lang, 'Nom', 'Name')}</th><th>Segment</th><th>{pick(lang, 'Rabais', 'Discount')}</th><th>{pick(lang, 'État', 'Status')}</th></tr></thead>
-            <tbody>{campaigns.map((c) => <tr key={c.id}><td>{c.name}</td><td>{pick(lang, ...LABEL[c.segment])}</td><td>{c.discountName ?? '—'}</td>
-              <td>{c.status === 'approved' ? <Badge tone="ok">{pick(lang, 'Approuvée', 'Approved')}{c.approvedBy ? ` · ${c.approvedBy}` : ''}</Badge>
-                : ctx.can('marketing.approve') ? <ApiForm action="/api/marketing/campaigns" extra={{ approve: c.id }} fields={[]} submit={pick(lang, 'Approuver', 'Approve')} tone="ghost" confirm={pick(lang, `Approuver « ${c.name} » ?`, `Approve “${c.name}”?`)} done={pick(lang, 'Approuvée.', 'Approved.')} />
-                : <Badge>{pick(lang, 'Brouillon', 'Draft')}</Badge>}</td></tr>)}</tbody></table></div>
+            <tbody>{campaigns.map((c) => <tr key={c.id}><td><a href={`/app/campaigns?campaign=${encodeURIComponent(c.id)}`}>{c.name}</a></td><td>{pick(lang, ...LABEL[c.segment])}</td><td>{c.discountName ?? '—'}</td>
+              <td>{c.status === 'approved' && c.approvalHash ? <Badge tone="ok">{pick(lang, 'Version approuvée', 'Version approved')}</Badge> : <Badge>{pick(lang, 'À vérifier', 'Needs review')}</Badge>}</td></tr>)}</tbody></table></div>
         )}
       </Card>
-      {ctx.can('marketing.campaigns') && (
+      {selectedId && !selected && <Banner tone="warn">{pick(lang, 'Cette campagne n’est pas disponible dans la liste de ce marchand.', 'This campaign is not available in this merchant’s list.')}</Banner>}
+      {selected && <CampaignReview ctx={ctx} campaign={selected} discounts={d.ok ? d.list : []} />}
+      {ctx.can('marketing.campaigns') && !selected && (
         <Card title={pick(lang, 'Nouveau brouillon', 'New draft')} icon="plus">
-          <ApiForm action="/api/marketing/campaigns" fields={[
-            { name: 'name', label: pick(lang, 'Nom', 'Name'), required: true },
-            { name: 'segment', label: 'Segment', type: 'select', options: SEGMENTS.map((k) => ({ value: k, label: pick(lang, ...LABEL[k]) })) },
-            { name: 'discountName', label: pick(lang, 'Rabais', 'Discount'), type: 'select', options: [{ value: '', label: '—' }, ...(d.ok ? d.list.map((x) => ({ value: x.name, label: x.name })) : [])] },
-            { name: 'messageFr', label: pick(lang, 'Message (français)', 'Message (French)'), type: 'textarea' },
-            { name: 'messageEn', label: pick(lang, 'Message (anglais)', 'Message (English)'), type: 'textarea' },
-          ]} submit={pick(lang, 'Enregistrer le brouillon', 'Save the draft')} done={pick(lang, 'Brouillon enregistré.', 'Draft saved.')} />
+          {!d.ok && <Banner tone="warn">{pick(lang, 'Les rabais Clover sont indisponibles. Vous pouvez préparer un brouillon sans rabais, puis le modifier.', 'Clover discounts are unavailable. You can prepare a draft without a discount and edit it later.')}</Banner>}
+          <ApiForm action="/api/marketing/campaigns" fields={campaignFields(lang, d.ok ? d.list : [])} submit={pick(lang, 'Enregistrer le brouillon', 'Save the draft')} done={pick(lang, 'Brouillon enregistré. Ouvrez-le dans la liste pour le vérifier.', 'Draft saved. Open it in the list to review it.')} />
         </Card>
       )}
     </>
   );
 }
 
+export async function CampaignReview({ ctx, campaign: listedCampaign, discounts }: { ctx: PageCtx; campaign: Campaign; discounts: Array<{ id: string; name: string }> }) {
+  const { lang, merchantId } = ctx;
+  const result = await previewCampaign(merchantId!, listedCampaign.id);
+  const preview = result.ok ? result.preview : null;
+  // The list can become stale while the preview reads Clover. Display and edit
+  // the same campaign version whose hash is submitted for approval.
+  const campaign = preview?.campaign ?? listedCampaign;
+  return (
+    <>
+      <Card title={pick(lang, `Vérifier : ${campaign.name}`, `Review: ${campaign.name}`)} icon="check" sub={pick(lang, 'L’approbation porte sur ce message, ce segment et la valeur actuelle du rabais dans Clover.', 'Approval covers this message, this segment and the current Clover discount value.')}>
+        <p><strong>{pick(lang, ...LABEL[campaign.segment])}</strong> · {campaign.discountName ?? pick(lang, 'Sans rabais', 'No discount')}</p>
+        {preview?.discount && <p>{pick(lang, 'Valeur vérifiée dans Clover :', 'Verified Clover value:')} {preview.discount.amountCents !== null ? money(preview.discount.amountCents, lang) : `${preview.discount.percentage} %`}</p>}
+        <div className="grid"><div><h3>{pick(lang, 'Message français', 'French message')}</h3><p style={{ whiteSpace: 'pre-wrap' }}>{campaign.messageFr || '—'}</p></div><div><h3>{pick(lang, 'Message anglais', 'English message')}</h3><p style={{ whiteSpace: 'pre-wrap' }}>{campaign.messageEn || '—'}</p></div></div>
+        {!result.ok ? <Banner tone="warn">{pick(lang, 'La campagne ne peut pas être vérifiée pour le moment. Vérifiez le rabais et la connexion Clover, puis actualisez cette page.', 'This campaign cannot be verified right now. Check the discount and Clover connection, then refresh this page.')}</Banner> : (
+          <>
+            <p>{pick(lang, `Contacts joignables avec consentement Clover : ${preview!.audience.consentedCount}. Clients dans ce segment : ${preview!.audience.segmentCount}.`, `Reachable contacts with Clover consent: ${preview!.audience.consentedCount}. Customers in this segment: ${preview!.audience.segmentCount}.`)}</p>
+            <p className="muted small">{pick(lang, 'Le consentement sera relu dans Clover au moment de chaque export. Aucun contact n’est affiché dans cet aperçu.', 'Consent is re-read from Clover for each export. No contact details are shown in this preview.')}</p>
+            {!preview!.canApprove && <Banner tone="warn">{pick(lang, 'Ajoutez un message en français ou en anglais avant d’approuver la campagne.', 'Add a French or English message before approving this campaign.')}</Banner>}
+            {preview!.approved ? (
+              <>
+                <Badge tone="ok">{pick(lang, 'Version approuvée', 'Version approved')}{campaign.approvedBy ? ` · ${campaign.approvedBy}` : ''}</Badge>
+                {ctx.can('marketing.export') && <p><a className="btn" href={`/api/marketing/export?campaign=${encodeURIComponent(campaign.id)}`}>{pick(lang, 'Exporter l’audience approuvée (CSV)', 'Export approved audience (CSV)')}</a></p>}
+              </>
+            ) : (
+              <>
+                {campaign.status === 'approved' && <Banner tone="warn">{pick(lang, 'Le contenu ou le rabais a changé depuis l’approbation. Cette version doit être approuvée de nouveau.', 'The content or discount changed after approval. Approve this version again.')}</Banner>}
+                {ctx.can('marketing.approve') && preview!.canApprove && <ApiForm key={preview!.configurationHash} action="/api/marketing/campaigns" extra={{ approve: campaign.id, previewHash: preview!.configurationHash }} fields={[]} submit={pick(lang, 'Approuver cette version', 'Approve this version')} confirm={pick(lang, 'Approuver ce message, ce segment et ce rabais ? Aucun message ne sera envoyé.', 'Approve this message, segment and discount? No message will be sent.')} done={pick(lang, 'Version approuvée. Vous pouvez exporter son audience.', 'Version approved. Its audience can now be exported.')} />}
+              </>
+            )}
+          </>
+        )}
+      </Card>
+      {ctx.can('marketing.campaigns') && <Card title={pick(lang, 'Modifier la campagne', 'Edit the campaign')} icon="tag" sub={pick(lang, 'Une modification du contenu annule l’approbation. Une nouvelle vérification sera requise.', 'A content change clears approval. Another review will be required.')}>
+        <ApiForm key={`${campaign.id}:${campaign.revision ?? 1}`} action="/api/marketing/campaigns" method="PATCH" extra={{ id: campaign.id, revision: campaign.revision ?? 1 }} fields={campaignFields(lang, discounts, campaign)} submit={pick(lang, 'Enregistrer les modifications', 'Save changes')} done={pick(lang, 'Modifications enregistrées. Vérifiez cette version avant de l’approuver.', 'Changes saved. Review this version before approving it.')} />
+        <p><a href="/app/campaigns">{pick(lang, 'Préparer une autre campagne', 'Prepare another campaign')}</a></p>
+      </Card>}
+    </>
+  );
+}
+
 async function Audience({ ctx }: { ctx: PageCtx }) {
   const { lang, merchantId } = ctx;
-  const s = await customerStats(merchantId!);
-  const counts = s.ok ? segmentCounts(s.list) : null;
+  const approved = (await listCampaigns(merchantId!)).filter((c) => c.status === 'approved' && c.approvalHash);
   return (
-    <Card title={pick(lang, 'Exporter une audience', 'Export an audience')} icon="download" sub={pick(lang, 'Seuls les clients qui ont accepté le marketing dans Clover sont dans le fichier. Chaque export est noté au journal d’activité.', 'Only customers who accepted marketing in Clover are in the file. Each export is written to the activity log.')}>
-      <div className="tiles">{SEGMENTS.map((k) => (
-        <a key={k} className="tile" href={`/api/marketing/export?segment=${k}`}>
+    <Card title={pick(lang, 'Audience des campagnes approuvées', 'Approved campaign audiences')} icon="download" sub={pick(lang, 'Ouvrez une campagne pour vérifier sa version et exporter seulement les contacts qui consentent toujours au marketing dans Clover.', 'Open a campaign to verify its version and export only contacts who still consent to marketing in Clover.')}>
+      {!approved.length ? <Empty icon="megaphone">{pick(lang, 'Aucune version approuvée pour le moment.', 'No approved version yet.')}</Empty> : <div className="tiles">{approved.map((c) => (
+        <a key={c.id} className="tile" href={`/app/campaigns?campaign=${encodeURIComponent(c.id)}`}>
           <span className="tile-mark"><Icon name="download" size={20} /></span>
-          <span className="tile-body"><span className="tile-title">{pick(lang, ...LABEL[k])}</span><span className="tile-text">{counts ? `${counts[k]} ${pick(lang, 'clients dans le segment', 'customers in the segment')}` : '—'} · CSV</span></span>
+          <span className="tile-body"><span className="tile-title">{c.name}</span><span className="tile-text">{pick(lang, ...LABEL[c.segment])} · {pick(lang, 'Vérifier et exporter', 'Review and export')}</span></span>
         </a>
-      ))}</div>
-      <p className="muted small">{pick(lang, 'Loi 25 : utilisez ce fichier seulement pour la campagne approuvée, puis supprimez-le.', 'Law 25: use this file only for the approved campaign, then delete it.')}</p>
+      ))}</div>}
+      <p><a href="/app/campaigns">{pick(lang, 'Préparer ou vérifier une campagne', 'Prepare or review a campaign')}</a></p>
+      <p className="muted small">{pick(lang, 'Utilisez le fichier pour la campagne approuvée et votre outil d’envoi autorisé. Cette app n’envoie aucun message.', 'Use the file for the approved campaign in your authorized sending tool. This app sends no messages.')}</p>
     </Card>
   );
 }

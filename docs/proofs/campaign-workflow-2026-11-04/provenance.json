@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "12d071c2f5130be88f56677c2f34f84b1fc3744c",
+  "scope": "Final combined campaign and merchant identity guard; built application with disposable PostgreSQL and local Clover fixture",
+  "productionVerified": false,
+  "sha256": {
+    "approved-campaign-desktop.png": "ddbd82ad53cb9d5b31763e3c6635c763949b025e97b90ac4577e30ccea76b708",
+    "approved-campaign-mobile.png": "0c49ef79fd9fe7561c3f13786a9af469708626d503ae58c7509d37e9f3ea3793",
+    "results.json": "736a5e688fb7f218aaf99aed23d5abe314f640ec6c8677fa9222e2854976de6c"
+  }
+}

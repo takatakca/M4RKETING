@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "checksPassed": 9,
+  "checks": [
+    "actual merchant browser creates a draft and previews the current Clover offer and counts without contact details; unapproved and legacy segment exports are denied",
+    "actual sessions enforce manager/admin approval/export boundaries and deny another merchant’s campaign",
+    "human approval of the reviewed version enables a real CSV download containing only the current consenting contact",
+    "consent withdrawal after approval is honored on the next export without a cached contact leak",
+    "editing the campaign clears its approval; the old preview and old export are both refused",
+    "approval snapshot survives PostgreSQL JSONB reordering and a real app restart; the mobile review remains usable",
+    "two real app processes competing on one locked PostgreSQL row preserve exactly one edit and return a conflict for the stale edit",
+    "an actual concurrent campaign edit during the Clover audience read prevents contacts from leaving the export route",
+    "all provider traffic stays on the local fixture; no messages, discounts or production services are written"
+  ],
+  "database": "disposable real PostgreSQL",
+  "applicationProcesses": 3,
+  "simultaneousApplicationProcesses": 2,
+  "clover": "isolated local HTTP fixture",
+  "providerWrites": 0,
+  "externalMessages": 0,
+  "pageErrors": [],
+  "buildId": "b2siEtry9F116sazCYQai",
+  "productionVerified": false
+}
